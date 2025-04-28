@@ -59,3 +59,4 @@ find "$INPUT_DIR" -type f | while IFS= read -r file; do
   dst="$OUTPUT_DIR/$new_rel"
   copy_with_suffix "$file" "$dst"
 done
+###
