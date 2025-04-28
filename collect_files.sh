@@ -10,16 +10,25 @@ usage() {
 
 M=1
 
-if [[ "${1:-}" == "--max_depth" ]]; then
-  [[ $# -ge 4 ]] || usage
-  [[ "$2" =~ ^[0-9]+$ ]] || usage
-  M="$2"
-  shift 2
-fi
+pos=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --max_depth)
+      shift
+      [[ $# -gt 0 && "$1" =~ ^[0-9]+$ ]] || usage
+      M=$1
+      shift
+      ;;
+    *)
+      pos+=("$1")
+      shift
+      ;;
+  esac
+done
 
-[[ $# -eq 2 ]] || usage
-INPUT_DIR="$1"
-OUTPUT_DIR="$2"
+[[ ${#pos[@]} -eq 2 ]] || usage
+INPUT_DIR=${pos[0]}
+OUTPUT_DIR=${pos[1]}
 
 
 if [[ ! -d "$INPUT_DIR" ]]; then
@@ -55,17 +64,21 @@ find "$INPUT_DIR" -type f | while IFS= read -r file; do
 
   rel="${file#"$INPUT_DIR"/}"
 
-  IFS='/' read -ra parts <<< "$rel"
-  N=${#parts[@]}
 
-  if (( N <= M )); then
+  IFS='/' read -ra parts <<< "$rel"
+  len=${#parts[@]}
+
+  if (( len <= M )); then
     new_parts=("${parts[@]}")
   else
-    drop=$(( N - M ))
+    drop=$(( len - M ))
     new_parts=("${parts[@]:drop}")
   fi
 
+
   new_rel="$(IFS=/; echo "${new_parts[*]}")"
+
+
   dst="$OUTPUT_DIR/$new_rel"
   copy_with_suffix "$file" "$dst"
 done
