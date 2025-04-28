@@ -6,66 +6,58 @@ usage() {
   exit 1
 }
 
-
 M=1
-
 if [[ "${1:-}" == "--max_depth" ]]; then
   shift
-  [[ $# -ge 1 && "$1" =~ ^[0-9]+$ ]] || usage
-  M="$1"; shift
+  [[ $# -eq 3 ]] || usage
+  [[ "$1" =~ ^[0-9]+$ ]] || usage
+  M=$1
+  shift
 fi
 
 [[ $# -eq 2 ]] || usage
-INPUT_DIR="$1"
-OUTPUT_DIR="$2"
+INPUT="$1"; OUTPUT="$2"
 
-if [[ ! -d "$INPUT_DIR" ]]; then
-  echo "ERROR: входная директория '$INPUT_DIR' не найдена" >&2
-  exit 1
-fi
-mkdir -p "$OUTPUT_DIR"
+[[ -d "$INPUT" ]] || { echo "ERROR: входная директория '$INPUT' не найдена" >&2; exit 1; }
+mkdir -p "$OUTPUT"
+
 
 copy_with_suffix() {
-  local srcpath="$1"
-  local dstpath="$2"
-  mkdir -p "$(dirname "$dstpath")"
-
-  local filename="$(basename "$dstpath")"
-  local base ext
-  if [[ "$filename" == *.* ]]; then
-    base="${filename%.*}"
-    ext=".${filename##*.}"
+  local SRC="$1" DST="$2"
+  mkdir -p "$(dirname "$DST")"
+  local BASE="$(basename "$DST")"
+  local NAME EXT
+  if [[ "$BASE" == *.* ]]; then
+    NAME="${BASE%.*}"
+    EXT=".${BASE##*.}"
   else
-    base="$filename"
-    ext=""
+    NAME="$BASE"
+    EXT=""
   fi
-
-  local target="$dstpath"
+  local TGT="$DST"
   local i=1
-  while [[ -e "$target" ]]; do
-    target="$(dirname "$dstpath")/${base}_$i${ext}"
+  while [[ -e "$TGT" ]]; do
+    TGT="$(dirname "$DST")/${NAME}_${i}${EXT}"
     ((i++))
   done
-
-  cp "$srcpath" "$target"
+  cp "$SRC" "$TGT"
 }
 
-export -f copy_with_suffix
 
-find "$INPUT_DIR" -type f | while IFS= read -r file; do
-  rel="${file#"$INPUT_DIR"/}"
-  IFS='/' read -r -a parts <<< "$rel"
-  num_dirs=$(( ${#parts[@]} - 1 ))
-  depth=$(( num_dirs + 1 ))
+find "$INPUT" -type f | while IFS= read -r FILE; do
+  REL="${FILE#"$INPUT"/}"
+  IFS='/' read -r -a PARTS <<< "$REL"
+  NDIR=$(( ${#PARTS[@]} - 1 ))
+  D=$(( NDIR + 1 ))
 
-  if (( depth <= M )); then
-    dest="$OUTPUT_DIR/$rel"
+  if (( D <= M )); then
+    NEW=( "${PARTS[@]}" )
   else
-    strip=$(( num_dirs - (M - 1) ))
-    new_parts=( "${parts[@]:strip}" )
-    new_rel="$(IFS=/; echo "${new_parts[*]}")"
-    dest="$OUTPUT_DIR/$new_rel"
+    DROP=$(( D - M ))
+    NEW=( "${PARTS[@]:DROP}" )
   fi
 
-  copy_with_suffix "$file" "$dest"
+  NEWREL="$(IFS=/; echo "${NEW[*]}")"
+  DST="$OUTPUT/$NEWREL"
+  copy_with_suffix "$FILE" "$DST"
 done
