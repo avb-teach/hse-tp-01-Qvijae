@@ -61,3 +61,4 @@ find "$INPUT" -type f | while IFS= read -r FILE; do
   DST="$OUTPUT/$NEWREL"
   copy_with_suffix "$FILE" "$DST"
 done
+
