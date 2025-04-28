@@ -1,40 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+
 usage() {
   echo "Usage: $0 [--max_depth N] INPUT_DIR OUTPUT_DIR" >&2
   exit 1
 }
 
 
-M=0
-INPUT_DIR=""
-OUTPUT_DIR=""
+M=1
 
+if [[ "${1:-}" == "--max_depth" ]]; then
+  [[ $# -ge 4 ]] || usage
+  [[ "$2" =~ ^[0-9]+$ ]] || usage
+  M="$2"
+  shift 2
+fi
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --max_depth)
-      shift
-      [[ $# -gt 0 && "$1" =~ ^[0-9]+$ ]] || usage
-      M=$1
-      shift
-      ;;
-    *)
-      if [[ -z "$INPUT_DIR" ]]; then
-        INPUT_DIR=$1
-      elif [[ -z "$OUTPUT_DIR" ]]; then
-        OUTPUT_DIR=$1
-      else
-        usage
-      fi
-      shift
-      ;;
-  esac
-done
-
-
-[[ -n "$INPUT_DIR" && -n "$OUTPUT_DIR" ]] || usage
+[[ $# -eq 2 ]] || usage
+INPUT_DIR="$1"
+OUTPUT_DIR="$2"
 
 
 if [[ ! -d "$INPUT_DIR" ]]; then
@@ -43,8 +28,9 @@ if [[ ! -d "$INPUT_DIR" ]]; then
 fi
 mkdir -p "$OUTPUT_DIR"
 
+
 copy_with_suffix() {
-  local SRC=$1 DST=$2
+  local SRC="$1" DST="$2"
   local DIR BASE NAME EXT TGT i
   DIR=$(dirname "$DST")
   BASE=$(basename "$DST")
@@ -68,19 +54,14 @@ copy_with_suffix() {
 find "$INPUT_DIR" -type f | while IFS= read -r file; do
 
   rel="${file#"$INPUT_DIR"/}"
+
   IFS='/' read -ra parts <<< "$rel"
+  N=${#parts[@]}
 
-  len=${#parts[@]}
-  if (( M > 0 )); then
-    keep=$(( M + 1 ))
-  else
-    keep=1
-  fi
-
-  if (( len <= keep )); then
+  if (( N <= M )); then
     new_parts=("${parts[@]}")
   else
-    drop=$(( len - keep ))
+    drop=$(( N - M ))
     new_parts=("${parts[@]:drop}")
   fi
 
