@@ -1,36 +1,61 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
-MAX_DEPTH=""
-if [[ "$1" == "--max_depth" ]]; then
-  MAX_DEPTH="-maxdepth $2"
-  shift 2
-fi
-INPUT_DIR="$1"
-OUTPUT_DIR="$2"
-
-if [[ ! -d "$INPUT_DIR" ]]; then
-  echo "ERROR: входная директория '$INPUT_DIR' не найдена" >&2
+usage() {
+  echo "Usage: $0 [--max_depth N] INPUT_DIR OUTPUT_DIR" >&2
   exit 1
-fi
-mkdir -p "$OUTPUT_DIR"
-
-copy_with_suffix() {
-  local src="$1"
-  local dst_dir="$2"
-  local base=$(basename "$src")
-  local name="${base%.*}"
-  local ext="${base#*.}"
-  local target="$dst_dir/$base"
-  local i=1
-  while [[ -e "$target" ]]; do
-    target="$dst_dir/${name}_$i.${ext}"
-    ((i++))
-  done
-  cp "$src" "$target"
 }
 
-find "$INPUT_DIR" $MAX_DEPTH -type f | while read -r file; do
-  copy_with_suffix "$file" "$OUTPUT_DIR"
+M=1
+if [[ "${1:-}" == "--max_depth" ]]; then
+  shift
+  [[ $# -ge 1 && "$1" =~ ^[0-9]+$ ]] || usage
+  M=$1
+  shift
+fi
+
+[[ $# -eq 2 ]] || usage
+INPUT_DIR=$1
+OUTPUT_DIR=$2
+
+[[ -d "$INPUT_DIR" ]] || { echo "ERROR: входная директория '$INPUT_DIR' не найдена" >&2; exit 1; }
+mkdir -p "$OUTPUT_DIR"
+
+
+copy_with_suffix() {
+  local SRC=$1 DST=$2
+  local DIR=$(dirname "$DST")
+  local BASE=$(basename "$DST")
+  local NAME EXT
+  if [[ "$BASE" == *.* ]]; then
+    NAME="${BASE%.*}"
+    EXT=".${BASE##*.}"
+  else
+    NAME="$BASE"
+    EXT=""
+  fi
+  mkdir -p "$DIR"
+  local TGT="$DST" i=1
+  while [[ -e "$TGT" ]]; do
+    TGT="$DIR/${NAME}_$i${EXT}"
+    ((i++))
+  done
+  cp "$SRC" "$TGT"
+}
+
+find "$INPUT_DIR" -type f | while IFS= read -r file; do
+  rel="${file#"$INPUT_DIR"/}"
+  IFS='/' read -ra parts <<< "$rel"
+  len=${#parts[@]}
+
+  if (( len <= M )); then
+    new_parts=( "${parts[@]}" )
+  else
+    start=$(( len - M ))
+    new_parts=( "${parts[@]:start}" )
+  fi
+
+  new_rel="$(IFS=/; echo "${new_parts[*]}")"
+  dst="$OUTPUT_DIR/$new_rel"
+  copy_with_suffix "$file" "$dst"
 done
