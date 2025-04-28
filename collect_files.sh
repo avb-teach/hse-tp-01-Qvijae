@@ -1,35 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-
 usage() {
-  cat <<EOF >&2
-Usage: $0 [--max_depth N] INPUT_DIR OUTPUT_DIR
-  --max_depth N   preserve directory structure up to depth N (default: flatten all)
-  INPUT_DIR       source directory
-  OUTPUT_DIR      destination directory
-EOF
+  echo "Usage: $0 [--max_depth N] INPUT_DIR OUTPUT_DIR" >&2
   exit 1
 }
 
 
 M=0
-if [[ "${1:-}" == "--max_depth" ]]; then
-  shift
-  [[ $# -ge 1 && "$1" =~ ^[0-9]+$ ]] || usage
-  M=$1
-  shift
+INPUT_DIR=""
+OUTPUT_DIR=""
+
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --max_depth)
+      shift
+      [[ $# -gt 0 && "$1" =~ ^[0-9]+$ ]] || usage
+      M=$1
+      shift
+      ;;
+    *)
+      if [[ -z "$INPUT_DIR" ]]; then
+        INPUT_DIR=$1
+      elif [[ -z "$OUTPUT_DIR" ]]; then
+        OUTPUT_DIR=$1
+      else
+        usage
+      fi
+      shift
+      ;;
+  esac
+done
+
+
+[[ -n "$INPUT_DIR" && -n "$OUTPUT_DIR" ]] || usage
+
+
+if [[ ! -d "$INPUT_DIR" ]]; then
+  echo "ERROR: входная директория '$INPUT_DIR' не найдена" >&2
+  exit 1
 fi
-
-
-[[ $# -eq 2 ]] || usage
-INPUT_DIR=$1
-OUTPUT_DIR=$2
-
-
-[[ -d "$INPUT_DIR" ]] || { echo "ERROR: входная директория '$INPUT_DIR' не найдена" >&2; exit 1; }
 mkdir -p "$OUTPUT_DIR"
-
 
 copy_with_suffix() {
   local SRC=$1 DST=$2
@@ -52,12 +64,18 @@ copy_with_suffix() {
   cp "$SRC" "$TGT"
 }
 
+
 find "$INPUT_DIR" -type f | while IFS= read -r file; do
-  
+
   rel="${file#"$INPUT_DIR"/}"
   IFS='/' read -ra parts <<< "$rel"
-  len=${#parts[@]}        
-  keep=$(( M + 1 ))       
+
+  len=${#parts[@]}
+  if (( M > 0 )); then
+    keep=$(( M + 1 ))
+  else
+    keep=1
+  fi
 
   if (( len <= keep )); then
     new_parts=("${parts[@]}")
